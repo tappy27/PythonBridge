@@ -1,3 +1,4 @@
+// ClientTickHandler.kt
 package com.github.tappy27.pythonbridge.client
 
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents
@@ -20,7 +21,8 @@ object ClientTickHandler {
         // ワールドの描画完了後に呼び出されるイベントを登録
         WorldRenderEvents.END.register { context ->
             val client = MinecraftClient.getInstance()
-            if (client.world != null) {
+            // ゲームが実行中で、ウィンドウが有効であることを確認
+            if (client.isRunning && client.world != null && client.window.handle != 0L && client.window.isFullscreen) {
                 tickCount++
 
                 // キャプチャのタイミング

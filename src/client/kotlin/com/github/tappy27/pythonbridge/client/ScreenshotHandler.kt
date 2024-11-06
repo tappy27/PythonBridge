@@ -1,3 +1,4 @@
+// ScreenshotHandler.kt
 package com.github.tappy27.pythonbridge.client
 
 import net.minecraft.client.MinecraftClient
@@ -10,7 +11,7 @@ import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.imageio.ImageIO
-import kotlin.concurrent.thread
+import com.mojang.blaze3d.systems.RenderSystem // 追加
 
 object ScreenshotHandler {
     private val logger = LogManager.getLogger(ScreenshotHandler::class.java)
@@ -19,6 +20,7 @@ object ScreenshotHandler {
     // 画像処理と送信を別スレッドで実行
     private val executor = java.util.concurrent.Executors.newSingleThreadExecutor()
 
+    // ソケットへの接続を確立するメソッド
     fun connectSocket() {
         try {
             socket = Socket("localhost", 5000)
@@ -28,7 +30,16 @@ object ScreenshotHandler {
         }
     }
 
+    // スクリーンショットをキャプチャして送信するメソッド
     fun captureAndSendScreenshot() {
+        // OpenGL操作はレンダースレッドで行う必要があるため、確認する
+        if (!RenderSystem.isOnRenderThread()) {
+            RenderSystem.recordRenderCall {
+                captureAndSendScreenshot()
+            }
+            return
+        }
+
         val client = MinecraftClient.getInstance()
         val framebuffer: Framebuffer = client.framebuffer
 
@@ -52,6 +63,13 @@ object ScreenshotHandler {
             org.lwjgl.opengl.GL11.GL_UNSIGNED_BYTE,
             byteBuffer
         )
+
+        // OpenGLエラーチェック
+        val error = org.lwjgl.opengl.GL11.glGetError()
+        if (error != org.lwjgl.opengl.GL11.GL_NO_ERROR) {
+            logger.error("OpenGL Error after glReadPixels: $error")
+            return
+        }
 
         byteBuffer.asIntBuffer().get(pixels)
 
@@ -99,5 +117,12 @@ object ScreenshotHandler {
             socket?.close()
             socket = null
         }
+    }
+
+    // アプリケーション終了時にリソースを解放
+    fun shutdown() {
+        executor.shutdownNow()
+        socket?.close()
+        logger.info("Resources have been released.")
     }
 }
